@@ -1,2 +1,12 @@
 xgboost
 pyarrow
+streamlit
+pandas
+numpy
+scikit-learn
+matplotlib
+seaborn
+pyathena
+boto3
+SKlearn
+scikit-learn

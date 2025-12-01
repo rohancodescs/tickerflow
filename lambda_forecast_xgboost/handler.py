@@ -73,6 +73,32 @@ def write_parquet_to_s3(df: pd.DataFrame, bucket: str, key: str):
         ContentType="application/octet-stream",
     )
 
+# ---------- Trading-day helper ----------
+
+def next_trading_day(d: pd.Timestamp) -> pd.Timestamp:
+    """
+    Given a date (or timestamp), return the next trading day (Mon–Fri),
+    skipping weekends.
+
+    Mon–Thu -> +1 day
+    Fri     -> +3 days (to Monday)
+    Sat     -> +2 days (to Monday)
+    Sun     -> +1 day (to Monday)
+    """
+    if pd.isna(d):
+        return d
+
+    ts = pd.to_datetime(d).normalize()  # strip time, keep date
+    dow = ts.weekday()  # Monday=0, Sunday=6
+
+    if 0 <= dow <= 3:          # Mon–Thu
+        return ts + pd.Timedelta(days=1)
+    elif dow == 4:             # Fri
+        return ts + pd.Timedelta(days=3)
+    elif dow == 5:             # Sat
+        return ts + pd.Timedelta(days=2)
+    else:                      # Sun (6)
+        return ts + pd.Timedelta(days=1)
 
 # ---------- Feature matrix construction ----------
 
@@ -95,7 +121,8 @@ BASE_FEATURES = [
 
 def build_latest_feature_matrix(df: pd.DataFrame, feature_names: list[str]):
     """
-    Take the latest row per symbol and build X with columns matching training-time feature_names.
+    Take the latest row per symbol and build X with columns matching
+    training-time feature_names.
     """
     if df.empty:
         raise RuntimeError("Features dataframe is empty; cannot build forecast matrix")
@@ -141,7 +168,6 @@ def find_latest_model_run_id(bucket: str, model_prefix: str) -> str:
     log.info("[FORECAST] Auto-selected latest model_run_id=%s", latest)
     return latest
 
-
 # ---------- Core forecasting logic ----------
 
 def generate_forecasts(
@@ -174,9 +200,11 @@ def generate_forecasts(
     pred_direction = np.sign(y_pred).astype(int)
 
     as_of_dates = latest["date"]
-    target_dates = as_of_dates + pd.to_timedelta(1, unit="D")
-    pred_adj_close = latest["adj_close"].astype(float) * np.exp(y_pred)
 
+    # >>> NEW: use next trading day, not calendar +1 <<<
+    target_dates = as_of_dates.apply(next_trading_day)
+
+    pred_adj_close = latest["adj_close"].astype(float) * np.exp(y_pred)
     created_ts = datetime.now(timezone.utc).isoformat()
 
     # IMPORTANT: these column names must match your Athena `tickerflow_forecasts` table
@@ -215,7 +243,6 @@ def generate_forecasts(
         "model_run_id": model_run_id,
         "target_date": target_dt,
     }
-
 
 # ---------- Lambda entrypoint ----------
 

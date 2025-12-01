@@ -36,14 +36,37 @@ filtered = df[df["symbol"].isin(sel)]
 st.write("Raw data", filtered)
 
 if not filtered.empty:
-    # Basic line plot
-    chart_df = (
-        filtered[["target_date", "symbol", "forecast_adj_close", "actual_adj_close"]]
-        .melt(id_vars=["target_date", "symbol"],
-              value_vars=["forecast_adj_close", "actual_adj_close"],
-              var_name="series",
-              value_name="price")
-    )
-    st.line_chart(chart_df.pivot_table(index="target_date",
-                                       columns=["symbol", "series"],
-                                       values="price"))
+    # Filter out rows where both values are None (non-trading days)
+    chart_data = filtered[
+        filtered["forecast_adj_close"].notna() | filtered["actual_adj_close"].notna()
+    ]
+    
+    if not chart_data.empty:
+        chart_df = (
+            chart_data[["target_date", "symbol", "forecast_adj_close", "actual_adj_close"]]
+            .melt(id_vars=["target_date", "symbol"],
+                  value_vars=["forecast_adj_close", "actual_adj_close"],
+                  var_name="series",
+                  value_name="price")
+        )
+        pivot_df = chart_df.pivot_table(index="target_date",
+                                        columns=["symbol", "series"],
+                                        values="price")
+        
+        # Flatten MultiIndex columns: ('AAPL', 'forecast_adj_close') -> 'AAPL_forecast_adj_close'
+        pivot_df.columns = ["_".join(col) for col in pivot_df.columns]
+        
+        st.line_chart(pivot_df)
+
+# if not filtered.empty:
+#     # Basic line plot
+#     chart_df = (
+#         filtered[["target_date", "symbol", "forecast_adj_close", "actual_adj_close"]]
+#         .melt(id_vars=["target_date", "symbol"],
+#               value_vars=["forecast_adj_close", "actual_adj_close"],
+#               var_name="series",
+#               value_name="price")
+#     )
+#     st.line_chart(chart_df.pivot_table(index="target_date",
+#                                        columns=["symbol", "series"],
+#                                        values="price"))

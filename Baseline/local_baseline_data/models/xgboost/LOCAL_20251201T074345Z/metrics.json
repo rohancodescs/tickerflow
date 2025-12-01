@@ -1,0 +1,79 @@
+{
+  "run_id": "LOCAL_20251201T074345Z",
+  "feature_names": [
+    "adj_close",
+    "volume",
+    "log_ret_1d",
+    "ret_mean_5",
+    "ret_std_5",
+    "ret_mean_10",
+    "ret_std_10",
+    "close_mean_5",
+    "close_std_5",
+    "close_mean_10",
+    "close_std_10",
+    "day_of_week",
+    "month",
+    "sym_AAPL",
+    "sym_AMZN",
+    "sym_GOOGL",
+    "sym_META",
+    "sym_MSFT"
+  ],
+  "split_info": {
+    "n_dates_total": 18,
+    "n_train_dates": 12,
+    "n_val_dates": 3,
+    "n_test_dates": 3,
+    "n_train_rows": 60,
+    "n_val_rows": 15,
+    "n_test_rows": 15
+  },
+  "baseline": {
+    "zero": {
+      "val": {
+        "rmse": 0.02425581400575761,
+        "mae": 0.019554422747062837,
+        "smape": 1.9999979424442778,
+        "directional_accuracy": 0.0,
+        "n_samples": 15
+      },
+      "test": {
+        "rmse": 0.014935962150597379,
+        "mae": 0.011520400641255304,
+        "smape": 1.9999950870957781,
+        "directional_accuracy": 0.0,
+        "n_samples": 15
+      }
+    }
+  },
+  "xgboost": {
+    "train": {
+      "rmse": 0.012846462726035996,
+      "mae": 0.009909025929684281,
+      "smape": 1.1933340221802782,
+      "directional_accuracy": 0.7333333333333333,
+      "n_samples": 60
+    },
+    "val": {
+      "rmse": 0.024410806730829814,
+      "mae": 0.019466708674607418,
+      "smape": 1.625501001070212,
+      "directional_accuracy": 0.4666666666666667,
+      "n_samples": 15
+    },
+    "test": {
+      "rmse": 0.01877312396233493,
+      "mae": 0.015302628650309819,
+      "smape": 1.763940513081606,
+      "directional_accuracy": 0.2,
+      "n_samples": 15
+    }
+  },
+  "timing_seconds": {
+    "prepare": 0.003855957998894155,
+    "train": 0.05023800002527423,
+    "eval": 0.0011656669958028942,
+    "total": 0.05525962501997128
+  }
+}

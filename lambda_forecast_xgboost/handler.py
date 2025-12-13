@@ -12,6 +12,7 @@ import pyarrow.parquet as pq
 from botocore.exceptions import ClientError
 from joblib import load as joblib_load
 
+
 log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(asctime)s %(message)s")
 

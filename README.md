@@ -33,21 +33,21 @@ This repository contains:
 
 ---
 
-## How the data is stored in S3 (AWS version)
+## How the data is stored in S3 
 
 TickerFlow uses an S3 "data lake" style layout:
 
-- 'raw/<SYMBOL>/dt=<YYYY-MM-DD>/ingest.json' (normalized daily rows)
+- 'raw/<SYMBOL>dt=<YYYY-MM-DD>/ingest.json' (normalized daily rows)
 - 'processed/dt=<YYYY-MM-DD>/ohlcv.parquet' (clean OHLCV (open high low close volume) partitions)
 - 'features/train.parquet' (model features)
 - 'models/xgboost/<run_id>/{model.joblib, metrics.json}'
 - 'forecasts/dt=<YYYY-MM-DD>/forecasts.parquet' (daily forecast partition)
 
-The forecast Lambda uses "next trading day" logic (not naïvely '+1 day'), e.g., Friday → Monday.
+The forecast Lambda uses "next trading day" logic (ie Friday → Monday) 
 
 ---
 
-## Reproducing the AWS pipeline (TA / grader workflow)
+## Reproducing the AWS pipeline 
 
 ### Prereqs
 
@@ -55,7 +55,7 @@ The forecast Lambda uses "next trading day" logic (not naïvely '+1 day'), e.g.,
 - Region: **us-east-1**
 - Permissions to view **Lambda, S3, CloudWatch Logs, Athena, Glue, SageMaker**
 
-### Step A - Run the pipeline (manual demo mode)
+### Step A - Run the pipeline (manual demo)
 
 1. **Run ingestion Lambda:** 'tickerflow-ingest'
    - Expected effect: new objects appear under 's3://<bucket>/raw/<SYMBOL>/dt=<date>/ingest.json'
@@ -66,24 +66,24 @@ The forecast Lambda uses "next trading day" logic (not naïvely '+1 day'), e.g.,
 3. **Run forecasting Lambda:** 'tickerflow-latest'
    - Expected effect: 'forecasts/dt=<next_trading_day>/forecasts.parquet'
 
-4. *(Optional)* **Run weekly training:** 'tickerflow-weekly-train'
+4. **Run weekly training:** 'tickerflow-weekly-train'
+   - This is optional since we already did the model training
    - Expected effect: SageMaker training job launches, writes 'models/xgboost/<run_id>/...'
 
 ### Step B - Refresh Athena partitions
 
 In Athena, run (order doesn't matter):
-'''sql
+
 MSCK REPAIR TABLE tickerflow_prices;
 MSCK REPAIR TABLE tickerflow_forecasts;
-'''
 
-Then verify:
-'''sql
+Then verify via:
+
 SELECT *
 FROM tickerflow_forecast_vs_actual
 ORDER BY target_date DESC, symbol
 LIMIT 50;
-'''
+
 
 > **Note:** 'tickerflow_forecast_vs_actual' is a view joining 'tickerflow_prices' and 'tickerflow_forecasts' on '(symbol, target_date)' and exposes the fields used by the dashboard (forecast price, actual price, errors, etc.).
 
@@ -108,29 +108,28 @@ For each Lambda invocation, CloudWatch's REPORT line provides:
 ### Steps
 
 1. Create a venv and install deps:
-'''bash
+
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-'''
+
 
 2. Configure AWS credentials (one-time):
-'''bash
+
 aws configure --profile tickerflow-ta
-# set region to us-east-1
-'''
+- make sure you set region to us-east-1
+
 
 3. Run Streamlit:
-'''bash
+
 export AWS_PROFILE=tickerflow-ta
 streamlit run dashboard.py
-'''
 
 ---
 
 ## Reproducing the Local Baseline (Notebook)
 
-This baseline runs the *same logical phases* locally: ingest → transform/DQ → features → train → forecast, and prints timing + accuracy metrics.
+This baseline runs the same logical phases from the AWS implementation locally: ingest → transform/DQ → features → train → forecast, and prints timing + accuracy metrics at the end.
 
 1. Open and run:
    - 'Baseline/baseline.ipynb'

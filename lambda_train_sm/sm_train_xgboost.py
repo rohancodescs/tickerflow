@@ -36,12 +36,9 @@ def load_features_from_s3(bucket: str, key: str) -> pd.DataFrame:
     return df
 
 
+# this function ensures we have a target_log_return column, if its missing we derive it from adj_close as next-day log returns
+# and then builds X, y, meta, and feature_names
 def prepare_data(df: pd.DataFrame):
-    """
-    Ensure we have a 'target_log_return' column.
-    If it's missing, derive it from adj_close as next-day log return per symbol.
-    Then build X, y, meta, feature_names.
-    """
     df = df.copy()
     df["date"] = pd.to_datetime(df["date"])
     df = df.sort_values(["symbol", "date"])
@@ -161,15 +158,11 @@ def eval_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
         "n_samples": int(len(y_true)),
     }
 
-
+# saves model under <prefix>/<run_id>/model.joblib
+# With MODEL_PREFIX = 'models/xgboost', this becomes:
+    #  models/xgboost/<run_id>/model.joblib
+    # which matches the forecast script's expectations.
 def save_model_to_s3(model, bucket: str, prefix: str, run_id: str) -> str:
-    """
-    Save model under:  <prefix>/<run_id>/model.joblib
-
-    With MODEL_PREFIX = 'models/xgboost', this becomes:
-      models/xgboost/<run_id>/model.joblib
-    which matches the forecast script's expectations.
-    """
     out_key = f"{prefix}/{run_id}/model.joblib"
     buf = io.BytesIO()
     dump(model, buf)
@@ -180,7 +173,7 @@ def save_model_to_s3(model, bucket: str, prefix: str, run_id: str) -> str:
         Body=buf.getvalue(),
         ContentType="application/octet-stream",
     )
-    log.info(f"[TRAIN] Saved model to s3://{bucket}/{out_key}")
+    log.info(f"Saved model to s3://{bucket}/{out_key}")
     return out_key
 
 
@@ -199,7 +192,7 @@ def save_metrics_to_s3(metrics: dict, bucket: str, prefix: str, run_id: str) -> 
     return out_key
 
 
-# ---------- main entrypoint (SageMaker-friendly) ----------
+# main file to parse cli args
 
 def parse_args():
     parser = argparse.ArgumentParser()

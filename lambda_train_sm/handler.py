@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
 
-# -------- helpers --------
+# helpers 
 
 def _env_bool(name: str, default: bool = False) -> bool:
     val = os.environ.get(name)
@@ -46,10 +46,10 @@ def lambda_handler(event, context):
     # This file lives in /var/task inside the Lambda image
     script_path = "sm_train_xgboost.py"
 
-    # IMPORTANT: source_dir="." so the bundle includes requirements.txt
+    # source_dir="." so the bundle includes requirements.txt
     estimator = SKLearn(
         entry_point=script_path,
-        source_dir=".",  # <── bundle /var/task (handler + sm_train_xgboost + requirements.txt)
+        source_dir=".",  # bundle /var/task (handler + sm_train_xgboost + requirements.txt)
         role=training_role_arn,
         instance_type="ml.m5.large",
         instance_count=1,
@@ -61,7 +61,6 @@ def lambda_handler(event, context):
             "bucket": bucket,
             "features-key": features_key,
             "model-prefix": model_prefix,
-            # You can add train-frac / val-frac / xgb-* overrides here if you want
         },
     )
 
@@ -75,7 +74,6 @@ def lambda_handler(event, context):
     try:
         estimator.fit(inputs=train_input, job_name=job_name, wait=wait_for_completion)
     except UnexpectedStatusException as e:
-        # Training job entered FAILED / STOPPED while we were waiting
         log.error("[TRAIN-LAMBDA] Training job failed: %s", e, exc_info=True)
         return {
             "status": "failed",
@@ -83,7 +81,7 @@ def lambda_handler(event, context):
             "message": str(e),
         }
 
-    # If we’re NOT waiting, just report submission
+    # If we’re not waiting, just report submission
     if not wait_for_completion:
         log.info("[TRAIN-LAMBDA] Submitted training job %s (async).", job_name)
         return {
@@ -108,5 +106,5 @@ def lambda_handler(event, context):
         "status": "completed",
         "job_name": job_name,
         "training_job_status": training_status,
-        "model_data": model_uri,  # may be None if SageMaker didn’t set it
+        "model_data": model_uri, 
     }

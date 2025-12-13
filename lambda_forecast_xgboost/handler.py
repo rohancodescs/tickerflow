@@ -91,13 +91,13 @@ def next_trading_day(d: pd.Timestamp) -> pd.Timestamp:
     ts = pd.to_datetime(d).normalize()  # strip time, keep date
     dow = ts.weekday()  # Monday=0, Sunday=6
 
-    if 0 <= dow <= 3:          # Mon–Thu
+    if 0 <= dow <= 3: # Mon–Thu
         return ts + pd.Timedelta(days=1)
-    elif dow == 4:             # Fri
+    elif dow == 4: # Fri
         return ts + pd.Timedelta(days=3)
-    elif dow == 5:             # Sat
+    elif dow == 5: # Sat
         return ts + pd.Timedelta(days=2)
-    else:                      # Sun (6)
+    else: # Sun (6)
         return ts + pd.Timedelta(days=1)
 
 # ---------- Feature matrix construction ----------
@@ -207,7 +207,6 @@ def generate_forecasts(
     pred_adj_close = latest["adj_close"].astype(float) * np.exp(y_pred)
     created_ts = datetime.now(timezone.utc).isoformat()
 
-    # IMPORTANT: these column names must match your Athena `tickerflow_forecasts` table
     forecast_df = pd.DataFrame(
         {
             "symbol": latest["symbol"],
@@ -244,7 +243,7 @@ def generate_forecasts(
         "target_date": target_dt,
     }
 
-# ---------- Lambda entrypoint ----------
+# Lambda entrypoint 
 
 def handler(event, context):
     """

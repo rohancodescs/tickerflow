@@ -16,17 +16,14 @@ log = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(asctime)s %(message)s")
 
 S3 = boto3.client("s3")
-
-# Defaults (can be overridden by environment variables or event)
 BUCKET = os.environ.get("BUCKET", "tickerflow-data-us-east-1")
 FEATURES_KEY = os.environ.get("FEATURES_KEY", "features/train.parquet")
 MODEL_PREFIX = os.environ.get("MODEL_PREFIX", "models/xgboost")
 FORECAST_PREFIX = os.environ.get("FORECAST_PREFIX", "forecasts")
 
-# ---------- S3 helpers ----------
 
 def load_parquet_from_s3(bucket: str, key: str) -> pd.DataFrame:
-    log.info("[FORECAST] Loading features from s3://%s/%s", bucket, key)
+    log.info("Loading features from s3://%s/%s", bucket, key)
     try:
         resp = S3.get_object(Bucket=bucket, Key=key)
     except ClientError as e:
@@ -40,7 +37,7 @@ def load_parquet_from_s3(bucket: str, key: str) -> pd.DataFrame:
 
 
 def load_json_from_s3(bucket: str, key: str) -> dict:
-    log.info("[FORECAST] Loading JSON from s3://%s/%s", bucket, key)
+    log.info("Loading JSON from s3://%s/%s", bucket, key)
     try:
         resp = S3.get_object(Bucket=bucket, Key=key)
     except ClientError as e:
@@ -48,9 +45,8 @@ def load_json_from_s3(bucket: str, key: str) -> dict:
     body = resp["Body"].read().decode("utf-8")
     return json.loads(body)
 
-
 def load_model_from_s3(bucket: str, key: str):
-    log.info("[FORECAST] Loading model from s3://%s/%s", bucket, key)
+    log.info("Loading model from s3://%s/%s", bucket, key)
     try:
         resp = S3.get_object(Bucket=bucket, Key=key)
     except ClientError as e:
@@ -59,9 +55,8 @@ def load_model_from_s3(bucket: str, key: str):
     model = joblib_load(buf)
     return model
 
-
 def write_parquet_to_s3(df: pd.DataFrame, bucket: str, key: str):
-    log.info("[FORECAST] Writing %d forecast rows to s3://%s/%s", len(df), bucket, key)
+    log.info("Writing %d forecast rows to s3://%s/%s", len(df), bucket, key)
     table = pa.Table.from_pandas(df)
     buf = io.BytesIO()
     pq.write_table(table, buf)
@@ -73,34 +68,22 @@ def write_parquet_to_s3(df: pd.DataFrame, bucket: str, key: str):
         ContentType="application/octet-stream",
     )
 
-# ---------- Trading-day helper ----------
-
 def next_trading_day(d: pd.Timestamp) -> pd.Timestamp:
-    """
-    Given a date (or timestamp), return the next trading day (Mon–Fri),
-    skipping weekends.
-
-    Mon–Thu -> +1 day
-    Fri     -> +3 days (to Monday)
-    Sat     -> +2 days (to Monday)
-    Sun     -> +1 day (to Monday)
-    """
     if pd.isna(d):
         return d
 
-    ts = pd.to_datetime(d).normalize()  # strip time, keep date
-    dow = ts.weekday()  # Monday=0, Sunday=6
+    ts = pd.to_datetime(d).normalize() 
+    dow = ts.weekday()  # monday = 0, sunday = 6
 
-    if 0 <= dow <= 3:          # Mon–Thu
+    if 0 <= dow <= 3:          
         return ts + pd.Timedelta(days=1)
-    elif dow == 4:             # Fri
+    elif dow == 4:             
         return ts + pd.Timedelta(days=3)
-    elif dow == 5:             # Sat
+    elif dow == 5:            
         return ts + pd.Timedelta(days=2)
-    else:                      # Sun (6)
+    else:                      
         return ts + pd.Timedelta(days=1)
 
-# ---------- Feature matrix construction ----------
 
 BASE_FEATURES = [
     "adj_close",
@@ -118,12 +101,8 @@ BASE_FEATURES = [
     "month",
 ]
 
-
+# uses last row per symbol
 def build_latest_feature_matrix(df: pd.DataFrame, feature_names: list[str]):
-    """
-    Take the latest row per symbol and build X with columns matching
-    training-time feature_names.
-    """
     if df.empty:
         raise RuntimeError("Features dataframe is empty; cannot build forecast matrix")
 
@@ -138,17 +117,12 @@ def build_latest_feature_matrix(df: pd.DataFrame, feature_names: list[str]):
     sym_dummies = pd.get_dummies(latest["symbol"], prefix="sym")
     X = pd.concat([X_num, sym_dummies], axis=1)
 
-    # Align to training feature order
     X = X.reindex(columns=feature_names, fill_value=0.0)
 
     return latest, X.values
 
-
+# inspect s3://bucket/model_prefix/* and return lexico newest run_id
 def find_latest_model_run_id(bucket: str, model_prefix: str) -> str:
-    """
-    Inspect s3://bucket/model_prefix/* and return the lexicographically latest run_id.
-    Assumes run_id folders look like: models/xgboost/20251128T052722Z/...
-    """
     prefix = model_prefix.rstrip("/") + "/"
     paginator = S3.get_paginator("list_objects_v2")
     run_ids: set[str] = set()
@@ -156,7 +130,7 @@ def find_latest_model_run_id(bucket: str, model_prefix: str) -> str:
     for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
         for obj in page.get("Contents", []):
             key = obj["Key"]
-            suffix = key[len(prefix) :]  # e.g. "20251128T052722Z/model.joblib"
+            suffix = key[len(prefix) :]
             parts = suffix.split("/")
             if parts and parts[0]:
                 run_ids.add(parts[0])
@@ -167,8 +141,6 @@ def find_latest_model_run_id(bucket: str, model_prefix: str) -> str:
     latest = sorted(run_ids)[-1]
     log.info("[FORECAST] Auto-selected latest model_run_id=%s", latest)
     return latest
-
-# ---------- Core forecasting logic ----------
 
 def generate_forecasts(
     bucket: str,
@@ -183,7 +155,6 @@ def generate_forecasts(
     model_key = f"{model_prefix}/{model_run_id}/model.joblib"
     metrics_key = f"{model_prefix}/{model_run_id}/metrics.json"
 
-    # Get feature order + model
     metrics = load_json_from_s3(bucket, metrics_key)
     feature_names = metrics.get("feature_names")
     if not feature_names:
@@ -191,7 +162,6 @@ def generate_forecasts(
 
     model = load_model_from_s3(bucket, model_key)
 
-    # Load features and build X
     df = load_parquet_from_s3(bucket, features_key)
     latest, X = build_latest_feature_matrix(df, feature_names)
 
@@ -201,13 +171,11 @@ def generate_forecasts(
 
     as_of_dates = latest["date"]
 
-    # >>> NEW: use next trading day, not calendar +1 <<<
     target_dates = as_of_dates.apply(next_trading_day)
 
     pred_adj_close = latest["adj_close"].astype(float) * np.exp(y_pred)
     created_ts = datetime.now(timezone.utc).isoformat()
 
-    # IMPORTANT: these column names must match your Athena `tickerflow_forecasts` table
     forecast_df = pd.DataFrame(
         {
             "symbol": latest["symbol"],
@@ -223,7 +191,6 @@ def generate_forecasts(
         }
     )
 
-    # One partition per target_date (normally just one)
     target_dates_unique = forecast_df["target_date"].unique()
     if len(target_dates_unique) != 1:
         log.warning(
@@ -244,21 +211,8 @@ def generate_forecasts(
         "target_date": target_dt,
     }
 
-# ---------- Lambda entrypoint ----------
-
+# entrypoint for lambda
 def handler(event, context):
-    """
-    Lambda entrypoint.
-
-    event can optionally include:
-      - bucket
-      - features_key
-      - model_prefix
-      - forecast_prefix
-      - model_run_id
-
-    If model_run_id is not provided (event or env), we'll auto-pick the latest.
-    """
     if not isinstance(event, dict):
         event = {}
 
@@ -278,5 +232,5 @@ def handler(event, context):
         model_prefix=model_prefix,
         forecast_prefix=forecast_prefix,
     )
-    log.info("[FORECAST] Lambda completed: %s", result)
+    log.info("Lambda (forecast) completed: %s", result)
     return result

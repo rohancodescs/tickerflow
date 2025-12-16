@@ -2,6 +2,9 @@
 
 TickerFlow is an event-driven stock forecasting pipeline built on AWS. It ingests end-of-day (EOD) stock data, performs transformation + data quality (DQ) checks, builds ML features, trains an XGBoost model (weekly), generates next-trading-day forecasts (daily), and serves "forecast vs actual" analytics through Athena + a Streamlit dashboard.
 
+# DEMO VIDEO HERE ON HOW TO RUN : https://youtu.be/P-ACT6gWtt0
+
+
 This repository contains:
 
 1. **AWS implementation** (serverless pipeline)
